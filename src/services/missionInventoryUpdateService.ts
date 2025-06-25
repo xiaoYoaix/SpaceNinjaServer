@@ -1127,8 +1127,24 @@ export const addMissionRewards = async (
         voidTearWave.Participants[0].QualifiesForReward &&
         !voidTearWave.Participants[0].HaveRewardResponse
     ) {
-        const reward = await crackRelic(inventory, voidTearWave.Participants[0], inventoryChanges);
-        MissionRewards.push({ StoreItem: reward.type, ItemCount: reward.itemCount });
+        // const reward = await crackRelic(inventory, voidTearWave.Participants[0], inventoryChanges);
+        // MissionRewards.push({ StoreItem: reward.type, ItemCount: reward.itemCount });
+
+        // 添加 rewardCount 参数（这里设为3表示一次遗物获得3个奖励）
+        const rewards = await relicHelper.crackRelic(
+            inventory,
+            voidTearWave.Participants[0],
+            inventoryChanges,
+            3 // 指定奖励数量
+        );
+
+        // 添加所有奖励到MissionRewards
+        for (const reward of rewards) {
+            MissionRewards.push({
+                StoreItem: reward.type,
+                ItemCount: reward.itemCount
+            });
+        }
     }
 
     if (strippedItems) {
