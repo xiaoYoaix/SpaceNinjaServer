@@ -7,40 +7,84 @@ import { addMiscItems, combineInventoryChanges } from "@/src/services/inventoryS
 import { handleStoreItemAcquisition } from "@/src/services/purchaseService";
 import { IInventoryChanges } from "../types/purchaseTypes";
 
+// export const crackRelic = async (
+//     inventory: TInventoryDatabaseDocument,
+//     participant: IVoidTearParticipantInfo,
+//     inventoryChanges: IInventoryChanges = {}
+// ): Promise<IRngResult> => {
+//     const relic = ExportRelics[participant.VoidProjection];
+//     const weights = refinementToWeights[relic.quality];
+//     logger.debug(`opening a relic of quality ${relic.quality}; rarity weights are`, weights);
+//     const reward = getRandomWeightedReward(
+//         ExportRewards[relic.rewardManifest][0] as { type: string; itemCount: number; rarity: TRarity }[], // rarity is nullable in PE+ typings, but always present for relics
+//         weights
+//     )!;
+//     logger.debug(`relic rolled`, reward);
+//     participant.Reward = reward.type;
+//
+//     // Remove relic
+//     const miscItemChanges = [
+//         {
+//             ItemType: participant.VoidProjection,
+//             ItemCount: -1
+//         }
+//     ];
+//     addMiscItems(inventory, miscItemChanges);
+//     combineInventoryChanges(inventoryChanges, { MiscItems: miscItemChanges });
+//
+//     // Give reward
+//     combineInventoryChanges(
+//         inventoryChanges,
+//         (await handleStoreItemAcquisition(reward.type, inventory, reward.itemCount)).InventoryChanges
+//     );
+//
+//     return reward;
+// };
+
+//开启一次遗物获取多次奖励，每次概率独立判断代码方法
 export const crackRelic = async (
     inventory: TInventoryDatabaseDocument,
     participant: IVoidTearParticipantInfo,
-    inventoryChanges: IInventoryChanges = {}
-): Promise<IRngResult> => {
+    inventoryChanges: IInventoryChanges = {},
+    rewardCount: number = 3 // 新增参数，默认1次
+): Promise<IRngResult[]> => { // 返回奖励数组
     const relic = ExportRelics[participant.VoidProjection];
     const weights = refinementToWeights[relic.quality];
-    logger.debug(`opening a relic of quality ${relic.quality}; rarity weights are`, weights);
-    const reward = getRandomWeightedReward(
-        ExportRewards[relic.rewardManifest][0] as { type: string; itemCount: number; rarity: TRarity }[], // rarity is nullable in PE+ typings, but always present for relics
-        weights
-    )!;
-    logger.debug(`relic rolled`, reward);
-    participant.Reward = reward.type;
 
-    // Remove relic
-    const miscItemChanges = [
-        {
-            ItemType: participant.VoidProjection,
-            ItemCount: -1
-        }
-    ];
+    logger.debug(`opening a relic of quality ${relic.quality}; rarity weights are`, weights);
+
+    // 生成多次独立奖励
+    const rewards: IRngResult[] = [];
+    for (let i = 0; i < rewardCount; i++) {
+        const reward = getRandomWeightedReward(
+            ExportRewards[relic.rewardManifest][0] as { type: string; itemCount: number; rarity: TRarity }[],
+            weights
+        )!;
+        rewards.push(reward);
+        logger.debug(`relic roll #${i+1}`, reward);
+    }
+
+    // 只设置第一个奖励到participant（兼容原有逻辑）
+    participant.Reward = rewards[0].type;
+
+    // 扣除一个遗物（保持不变）
+    const miscItemChanges = [{
+        ItemType: participant.VoidProjection,
+        ItemCount: -1
+    }];
     addMiscItems(inventory, miscItemChanges);
     combineInventoryChanges(inventoryChanges, { MiscItems: miscItemChanges });
 
-    // Give reward
-    combineInventoryChanges(
-        inventoryChanges,
-        (await handleStoreItemAcquisition(reward.type, inventory, reward.itemCount)).InventoryChanges
-    );
+    // 添加所有奖励到库存
+    for (const reward of rewards) {
+        combineInventoryChanges(
+            inventoryChanges,
+            (await handleStoreItemAcquisition(reward.type, inventory, reward.itemCount)).InventoryChanges
+        );
+    }
 
-    return reward;
+    return rewards; // 返回所有奖励结果
 };
-
 const refinementToWeights = {
     VPQ_BRONZE: {
         COMMON: 0.76,
