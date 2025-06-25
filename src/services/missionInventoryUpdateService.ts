@@ -1131,7 +1131,7 @@ export const addMissionRewards = async (
         // MissionRewards.push({ StoreItem: reward.type, ItemCount: reward.itemCount });
 
         // 添加 rewardCount 参数（这里设为3表示一次遗物获得3个奖励）
-        const rewards = await relicHelper.crackRelic(
+        const rewards = await crackRelic(
             inventory,
             voidTearWave.Participants[0],
             inventoryChanges,
